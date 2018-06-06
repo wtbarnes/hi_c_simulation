@@ -1,0 +1,19 @@
+name: hic_simulation
+channels:
+- defaults
+- conda-forge
+dependencies:
+- python=3.6
+- numpy
+- numba
+- scipy
+- matplotlib
+- h5py
+- astropy
+- sunpy
+- dask
+- pip:
+  - plasmapy
+  - git+git://github.com/wtbarnes/fiasco.git
+  - git+git://github.com/wtbarnes/synthesizAR.git
+  - git+git://github.com/rice-solar-physics/hydrad_tools.git
