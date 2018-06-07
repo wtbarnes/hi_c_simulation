@@ -9,7 +9,7 @@
 #SBATCH --mail-user=wtb2@rice.edu
 #SBATCH --mail-type=FAIL
 #SBATCH --cpus-per-task=1
-#SBATCH --mem-per-cpu=1G
+#SBATCH --mem-per-cpu=500M
 
 ### Setup needed parameters
 printf -v LOOP_NUM "%06d" $SLURM_ARRAY_TASK_ID
