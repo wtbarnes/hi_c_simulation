@@ -15,6 +15,7 @@ dependencies:
 - yt
 - pip:
   - plasmapy
+  - asdf
   - git+git://github.com/wtbarnes/fiasco.git
   - git+git://github.com/wtbarnes/synthesizAR.git
   - git+git://github.com/rice-solar-physics/hydrad_tools.git
