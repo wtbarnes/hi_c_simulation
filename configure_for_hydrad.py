@@ -26,7 +26,7 @@ base_config = {
     'general': {
         'total_time': 5e4 * u.s,
         #'loop_length': 80 * u.Mm,
-        'footpoint_height': 5e8 * u.cm,
+        #'footpoint_height': 5e8 * u.cm,
         'output_interval': 5*u.s,
         'loop_inclination': 0*u.deg,
         'logging_frequency': 1000,

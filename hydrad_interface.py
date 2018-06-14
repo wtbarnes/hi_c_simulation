@@ -25,6 +25,8 @@ class HYDRADInterface(object):
         config = self.base_config.copy()
         # General configuration
         config['general']['loop_length'] = loop.full_length
+        # This makes sure that the chromosphere does not take up the whole loop
+        config['general']['footpoint_height'] = 0.5 * min(10*u.Mm, 0.5*loop.full_length)
         config['initial_conditions']['heating_location'] = loop.full_length / 2.
         config['grid']['minimum_cells'] = int(loop.full_length / self.max_grid_cell)
         # Gravity and cross-section coefficients
