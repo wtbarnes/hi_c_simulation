@@ -24,25 +24,25 @@ def interpolate_to_uniform_grid(hydrad_root, delta_s: u.cm,):
     # Create uniform coordinate
     s_uniform = np.arange(0,s.loop_length.to(u.cm).value, delta_s.to(u.cm).value)*u.cm
     # Preallocate space for arrays
-    electron_temperature = np.zeros(s_uniform.shape+s.time.shape)
-    ion_temperature = np.zeros(s_uniform.shape+s.time.shape)
-    density = np.zeros(s_uniform.shape+s.time.shape)
-    velocity = np.zeros(s_uniform.shape+s.time.shape)
+    electron_temperature = np.zeros(s.time.shape+s_uniform.shape)
+    ion_temperature = np.zeros(s.time.shape+s_uniform.shape)
+    density = np.zeros(s.time.shape+s_uniform.shape)
+    velocity = np.zeros(s.time.shape+s_uniform.shape)
     # Interpolate each quantity at each timestep
     for i,_ in enumerate(s.time):
         p = s[i]
         coord = p.coordinate.to(u.cm).value
         # Temperature
         tsk = splrep(coord, p.electron_temperature.to(u.K).value,)
-        electron_temperature[:,i] = splev(s_uniform.value, tsk, ext=0)
+        electron_temperature[i,:] = splev(s_uniform.value, tsk, ext=0)
         tsk = splrep(coord, p.ion_temperature.to(u.K).value,)
-        ion_temperature[:,i] = splev(s_uniform.value, tsk, ext=0)
+        ion_temperature[i,:] = splev(s_uniform.value, tsk, ext=0)
         # Density
         tsk = splrep(coord, p.electron_density.to(u.cm**(-3)).value)
-        density[:,i] = splev(s_uniform.value,tsk,ext=0)
+        density[i,:] = splev(s_uniform.value,tsk,ext=0)
         # Velocity
         tsk = splrep(coord, p.velocity.to(u.cm/u.s).value,)
-        velocity[:,i] = splev(s_uniform.value, tsk, ext=0)
+        velocity[i,:] = splev(s_uniform.value, tsk, ext=0)
         
     return s.time, s_uniform, electron_temperature*u.K, ion_temperature*u.K, density*u.cm**(-3), velocity*u.cm/u.s
 
