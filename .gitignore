@@ -1,3 +1,6 @@
+# Ignore movies
+*.mp4
+
 # Dask files
 *dask-worker-space/*
 
