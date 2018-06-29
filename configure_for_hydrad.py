@@ -24,7 +24,7 @@ active_region = synthesizAR.Field.restore(args.ar_path)
 # Setup base configuration
 base_config = {
     'general': {
-        'total_time': 5e4 * u.s,
+        'total_time': 2.5e4 * u.s,
         #'loop_length': 80 * u.Mm,
         #'footpoint_height': 5e8 * u.cm,
         'output_interval': 5*u.s,
@@ -61,11 +61,11 @@ base_config = {
         'density_dependent_rates': False,
         'optically_thick_radiation': False,
         'nlte_chromosphere': False,
-        'ranges_dataset': 'ranges',
-        'emissivity_dataset': 'chianti_v7',
-        'abundance_dataset': 'asplund',
-        'rates_dataset': 'chianti_v7',
-        'elements_equilibrium': ['Fe'],
+        #'ranges_dataset': 'ranges',
+        #'emissivity_dataset': 'chianti_v7',
+        #'abundance_dataset': 'asplund',
+        #'rates_dataset': 'chianti_v7',
+        'elements_equilibrium': [],
         'elements_nonequilibrium': [],
     },
     'heating': {
