@@ -27,7 +27,7 @@ class InstrumentHiC(InstrumentBase):
     High Resolution Coronal Imager (Hi-C) instrument
     """
     
-    def __init__(self, observing_time, observer_coordinate, fov={}):
+    def __init__(self, observing_time, observer_coordinate, fov={}, **kwargs):
         self._fov = fov
         self.fits_template['telescop'] = 'HiC'
         self.fits_template['detector'] = 'HiC'
@@ -36,7 +36,8 @@ class InstrumentHiC(InstrumentBase):
         self.channels = [{'wavelength': 171*u.angstrom, 'name': '171', 'intstrument_label': 'HiC',
                           'gaussian_width': {'x': 0.962*u.pixel, 'y': 0.962*u.pixel}},]
         self.cadence = 6.0*u.s
-        self.resolution = SpatialPair(x=0.1*u.arcsec/u.pixel, y=0.1*u.arcsec/u.pixel, z=None)
+        self.resolution = kwargs.get('resolution',
+                                     SpatialPair(x=0.1*u.arcsec/u.pixel, y=0.1*u.arcsec/u.pixel, z=None))
         super().__init__(observing_time, observer_coordinate)
         self._setup_channels()
         
@@ -83,16 +84,13 @@ class InstrumentHiC(InstrumentBase):
         super().build_detector_file(file_template, dset_shape, chunks, *args,
                                     additional_fields=additional_fields, parallel=parallel)
     
-    def interpolate_and_store(self, y, loop, start_index, dset_name):
+    def interpolate(self, y, loop):
         """
         Interpolate in time and write to HDF5 file.
         """
         f_t = interp1d(loop.time.value, y.value, axis=0, kind='linear', fill_value='extrapolate')
         interpolated_y = f_t(self.observing_time.value)
-        lock = distributed.Lock(f'hdf5_{self.name}')
-        with lock:
-            with h5py.File(self.counts_file, 'a') as hf:
-                self.commit(interpolated_y * y.unit, hf[dset_name], start_index)
+        return interpolated_y * y.unit
     
     def flatten_parallel(self, loops, interpolated_loop_coordinates, emission_model=None):
         """
@@ -105,18 +103,21 @@ class InstrumentHiC(InstrumentBase):
         if emission_model is None:
             raise ValueError('Emission Model required')
 
-        futures = []
+        futures = {}
         for channel in self.channels:
             # Flatten emissivities for appropriate channel
-            flat_emiss = self.flatten_emissivities(channel, emission_model)
-            # Create partial functions
-            partial_counts = toolz.curry(self.calculate_counts)(
-                channel, emission_model=emission_model, flattened_emissivities=flat_emiss)
+            flat_emiss = client.scatter(self.flatten_emissivities(channel, emission_model))
+            # Build partials for functions
+            #partial_counts = toolz.curry(self.calculate_counts)(
+            #    channel, emission_model=emission_model, flattened_emissivities=flat_emiss)
+            #partial_write = toolz.curry(self.write_to_hdf5)(dset_name=channel['name'])
             # Map functions to iterables
-            loop_futures = client.map(partial_counts, loops, start_indices, pure=False)
-            # Block until complete
-            #distributed.client.wait([loop_futures])
-            futures += loop_futures
+            futures[channel['name']] = []
+            for i,loop in enumerate(loops):
+                y = client.submit(self.calculate_counts, channel, loop, emission_model, flat_emiss, pure=False)
+                interp_y = client.submit(self.interpolate, y, loop, pure=False)
+                futures[channel['name']].append(
+                    client.submit(self.write_to_hdf5, interp_y, start_indices[i], channel['name'], pure=False))
 
         return futures
     
@@ -135,7 +136,7 @@ class InstrumentHiC(InstrumentBase):
                     start_index += interp_s.shape[0]
                     progress.update()
     
-    def calculate_counts(self, channel, loop, start_index, emission_model, flattened_emissivities):
+    def calculate_counts(self, channel, loop, emission_model, flattened_emissivities):
         """
         Calculate Hi-C intensity as a function of time and space
         """
@@ -154,8 +155,7 @@ class InstrumentHiC(InstrumentBase):
             if not hasattr(counts, 'unit'):
                 counts = counts*counts_tmp.unit
             counts += counts_tmp
-        client = distributed.get_client()
-        return client.submit(self.interpolate_and_store, counts, loop, start_index, channel['name'])
+        return counts
     
     @staticmethod
     def flatten_emissivities(channel, emission_model):
@@ -268,14 +268,20 @@ class CustomEmissionModel(EmissionModel):
         ion : `~fiasco.Ion`
         """
         with h5py.File(self.ionization_fraction_savefile, 'r') as hf:
-            temperature = u.Quantity(hf['temperature'][:], get_keys(hf['temperature'].attrs, ('unit', 'units')))
+            temperature = hf['temperature'][:]
+            tunit = get_keys(hf['temperature'].attrs, ('unit', 'units'))
             dset = hf[ion.element_name]
             ionization_fraction = dset[:, ion.charge_state]
             unit = get_keys(dset.attrs, ('unit', 'units'))
-        
+        temperature = u.Quantity(temperature, tunit)
+        #dex = 0.01
+        #logTmin = np.log10(self.temperature.value.min())
+        #logTmax = np.log10(self.temperature.value.max())
+        #temperature = u.Quantity(10.**(np.arange(logTmin, logTmax+dex, dex)), self.temperature.unit)
+        #ionization_fraction = Element(ion.element_name, temperature).equilibrium_ionization()[:,ion.charge_state].value
         f_interp = interp1d(temperature.value, ionization_fraction, fill_value='extrapolate')
         ionization_fraction = f_interp(loop_electron_temperature.to(temperature.unit).value)
         ionization_fraction = np.where(ionization_fraction < 0., 0., ionization_fraction)
 
-        return u.Quantity(ionization_fraction, unit)
+        return u.Quantity(ionization_fraction,unit)
     
